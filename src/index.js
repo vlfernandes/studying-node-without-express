@@ -1,6 +1,7 @@
 const http = require("http");
 const { URL } = require("url");
 
+const bodyParser = require("./helpers/bodyParser");
 const routes = require("./routes");
 
 const server = http.createServer((request, response) => {
@@ -22,20 +23,24 @@ const server = http.createServer((request, response) => {
     (routeObj) => routeObj.endpoint === pathname && routeObj.method === request.method
   );
 
-  if (route) {
-    request.query = Object.fromEntries(parsedUrl.searchParams);
-    request.params = { id };
-
-    response.send = (statusCode, body) => {
-      response.writeHead(statusCode, { "Content-Type": "application/json" });
-      response.end(JSON.stringify(body));
-    };
-
-    route.handler(request, response);
-  } else {
+  if (!route) {
     response.writeHead(404, { "Content-Type": "text/html" });
     response.end(`Cannot ${request.method} ${parsedUrl.pathname}`);
+    return;
   }
+
+  request.query = Object.fromEntries(parsedUrl.searchParams);
+  request.params = { id };
+
+  response.send = (statusCode, body) => {
+    response.writeHead(statusCode, { "Content-Type": "application/json" });
+    response.end(JSON.stringify(body));
+  };
+
+  if (["POST", "PUT", "PATCH"].includes(request.method))
+    return bodyParser(request, () => route.handler(request, response));
+
+  route.handler(request, response);
 });
 
 server.listen(3000, () => console.log("Server started at http://localhost:3000"));
